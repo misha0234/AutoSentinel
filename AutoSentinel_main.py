@@ -19,13 +19,17 @@ import os
 
 PROCESS_IMAGE = True
 PROCESS_IMAGE = False
-VIDEOFILE="CarND-Advanced-Lane-Lines/project_video.mp4"
-SKIP_COUNT=225
+VIDEOFILE="../CarND-Vehicle-Detection/project_video.mp4"
+SKIP_COUNT=0 #225=
 SCALER_MODEL_FILE = "Scaler_Car_Classifier.pkl"
 SVC_MODEL_FILE = "SVC_Car_Classifier.pkl"
 FORCE_TRAIN_CLASSIFIER = True
 FORCE_TRAIN_CLASSIFIER = False
-HEATMAP_THRESHOLD = 3
+HEATMAP_THRESHOLD = 13
+HEAT_SCALING = 0.9
+ENABLE_HEATMAP_HISTORY = True
+ROI_Y1, ROI_Y2 = 400, 660
+IMAGE_SCALING = 1.3
 
 color_space = 'YCrCb' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
 orient = 9  # HOG orientations
@@ -71,7 +75,6 @@ def download_data():
         os.system("rm -rf data/__M*")
 
 # Divide up into cars and notcars
-#images = glob.glob('*.jpeg')
 cars = []
 notcars = []
 get_image_names()
@@ -81,21 +84,17 @@ for image_fname in image_fnames:
     else:
         cars.append(image_fname)
 
-# Define a function to extract features from a single image window
-# This function is very similar to extract_features()
-# just for a single image rather than list of images
 def single_feat_vec(img_in, hog0, hog1, hog2, window,
                     spatial_feat = True, hist_feat = True, hog_feat = True):
     #1) Define an empty list to receive features
     img_features = []
-    #print window
+
     wx1 = window[0][0]
     wy1 = window[0][1]
     wx2 = window[1][0]
     wy2 = window[1][1]
     img = img_in[wy1:wy2, wx1:wx2, :]
-    img = cv2.resize(img, (64, 64))
-    #2) Apply color conversion if other than 'RGB'
+
     #3) Compute spatial features if flag is set
     if spatial_feat == True:
         spatial_features = bin_spatial(img, size=spatial_size)
@@ -107,14 +106,16 @@ def single_feat_vec(img_in, hog0, hog1, hog2, window,
         #6) Append features to list
         img_features.append(hist_features)
     #7) Compute HOG features if flag is set
+    hogf = []
     if hog_feat == True:
         whx1 = wx1/pix_per_cell
         why1 = wy1/pix_per_cell
         whw = (wx2-wx1)/pix_per_cell-1
         whh = (wy2-wy1)/pix_per_cell-1
-        hogf0 = hog0[why1:why1+whh, whx1:whx1+whw, :, :, :].ravel()
-        hogf1 = hog1[why1:why1+whh, whx1:whx1+whw, :, :, :].ravel()
-        hogf2 = hog2[why1:why1+whh, whx1:whx1+whw, :, :, :].ravel()
+
+        hogf0 = hog0[why1:why1+whh, whx1:whx1+whw].ravel()
+        hogf1 = hog1[why1:why1+whh, whx1:whx1+whw].ravel()
+        hogf2 = hog2[why1:why1+whh, whx1:whx1+whw].ravel()
         hogf = np.hstack((hogf0, hogf1, hogf2))
         #8) Append features to list
         img_features.append(hogf)
@@ -146,6 +147,9 @@ def single_img_features(img, color_space='RGB', spatial_size=(32, 32),
             feature_image = cv2.cvtColor(img, cv2.COLOR_RGB2YCR_CB)
     else: feature_image = np.copy(img)
 
+    #spatial_feat = False
+    #hist_feat = False
+    #hog_feat = False
     #3) Compute spatial features if flag is set
     if spatial_feat == True:
         spatial_features = bin_spatial(feature_image, size=spatial_size)
@@ -173,8 +177,7 @@ def single_img_features(img, color_space='RGB', spatial_size=(32, 32),
         img_features.append(hog_features)
 
     #9) Return concatenated array of features
-    result = np.concatenate(img_features)
-    return result
+    return np.concatenate(img_features)
 
 def validate_window(window):
     x1, y1, x2, y2 = window[0][0], window[0][1], window[1][0], window[1][1];
@@ -210,6 +213,7 @@ def search_windows(img, windows, clf, scaler, color_space='RGB',
 
         global features_algo2
         features_algo2 = features
+        #return on_windows
         #5) Scale extracted features to be fed to classifier
         test_features = scaler.transform(np.array(features).reshape(1, -1))
         #6) Predict using your classifier
@@ -218,6 +222,7 @@ def search_windows(img, windows, clf, scaler, color_space='RGB',
         #7) If positive (prediction == 1) then save the window
         if prediction == 1:
             on_windows.append(window)
+
     #8) Return windows for positive detections
     return on_windows
 
@@ -236,7 +241,7 @@ def hstack_img(src1, src2):
 
 # Reduce the sample size because
 # The quiz evaluator times out after 13s of CPU time
-#sample_size = 1500
+#sample_size = 150
 #cars = cars[0:sample_size]
 #notcars = notcars[0:sample_size]
 def train_car_classifier():
@@ -306,8 +311,7 @@ def add_heat(heatmap, bbox_list):
     for box in bbox_list:
         # Add += 1 for all pixels inside each bbox
         # Assuming each "box" takes the form ((x1, y1), (x2, y2))
-
-        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1*HEAT_SCALING
 
     # Return updated heatmap
     return heatmap
@@ -320,6 +324,7 @@ def apply_threshold(heatmap, threshold):
 
 
 def draw_labeled_bboxes(img, labels):
+    y2t = ROI_Y1
     # Iterate through all detected cars
     for car_number in range(1, labels[1]+1):
         # Find pixels with each car_number label value
@@ -331,19 +336,46 @@ def draw_labeled_bboxes(img, labels):
         bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
         # Draw the box on the image
         x1, y1, x2, y2 = bbox[0][0], bbox[0][1], bbox[1][0], bbox[1][1];
+        if y2 > y2t:
+            y2t = y2
         w, h = x2-x1, y2-y1
         if (w >= h):
             cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
     # Return the image
-    return img
+    return img, y2t
 
 from scipy.ndimage.measurements import label
+gHeatmap = None
+heat_count = 0
+HEAT_MAX = 1
+heat_threshold = HEATMAP_THRESHOLD
+if ENABLE_HEATMAP_HISTORY:
+    HEAT_MAX = 5
 def process_heat_map(image, hot_windows):
-    heatmap = np.zeros_like(image[:,:,0]).astype(np.float)
-    heatmap = add_heat(heatmap, hot_windows)
-    apply_threshold(heatmap, HEATMAP_THRESHOLD)
+    global heat_count, gHeatmap, heat_threshold, HEAT_SCALING
+    if gHeatmap == None:
+        gHeatmap = np.zeros((image.shape[0], image.shape[1], HEAT_MAX))#[:,:,0]).astype(np.float)
+    
+    heat_count += 1
+    heat_count %= HEAT_MAX
+    gHeatmap[:,:,heat_count] = np.zeros((image.shape[0], image.shape[1]))#[:,:,0]).astype(np.float)
+    gHeatmap[:,:,heat_count] = add_heat(gHeatmap[:,:,heat_count], hot_windows)
+    heatmap = np.sum(gHeatmap, axis=2)
+
+    apply_threshold(heatmap, heat_threshold)
     labels = label(heatmap)
-    image = draw_labeled_bboxes(image, labels)
+    #print "---", labels[1], heat_threshold, np.max(gHeatmap), np.max(heatmap), HEAT_MAX, heat_count
+
+    image, y2t = draw_labeled_bboxes(image, labels)
+    if labels[1] > 0:
+        heat_threshold = HEATMAP_THRESHOLD - 4
+        HEAT_SCALING = 0.9
+    else:
+        heat_threshold = HEATMAP_THRESHOLD
+        HEAT_SCALING = 1.1
+    global IMAGE_SCALING
+    IMAGE_SCALING = 1.0 + 0.7*(y2t - ROI_Y1)/(ROI_Y2-ROI_Y1) #scaling should be between 1.5 and 1
+    print IMAGE_SCALING, y2t, ROI_Y1, ROI_Y2
     return image
 
 def debug_windows(image, windows):
@@ -358,22 +390,28 @@ def debug_windows(image, windows):
 
 
 features_algo1 = None
-def detect_cars(image):
-    y_u, y_d = 400, 705
+def detect_vehicles(image):
+    y_u, y_d = ROI_Y1, ROI_Y2
     draw_image = np.copy(image)
-    image = image[y_u:y_d, :, :]
     image = image.astype(np.float32)/255
+    image = image[y_u:y_d, :, :]
 
     hog_features = []
-    window_shift_cells = 2
+    window_shift_cells = 1
     shift = window_shift_cells * pix_per_cell
+    #window_w, window_h = 128, 128
     window_w, window_h = 64, 64
-    window_n = image.shape[0]/window_w
+    scale = 1.3 #window_w/64
+    scale = IMAGE_SCALING
+    image = cv2.resize(image, (int(image.shape[1]/scale), int(image.shape[0]/scale)))
 
-    fimage = cv2.cvtColor(image, cv2.COLOR_RGB2YCR_CB)
-    hog0 = get_hog_features(fimage[:,:,0], orient, pix_per_cell, cell_per_block, vis=False, feature_vec=False)
-    hog1 = get_hog_features(fimage[:,:,1], orient, pix_per_cell, cell_per_block, vis=False, feature_vec=False)
-    hog2 = get_hog_features(fimage[:,:,2], orient, pix_per_cell, cell_per_block, vis=False, feature_vec=False)
+    fimage = cv2.cvtColor(image, cv2.COLOR_BGR2YCR_CB)
+    hog0 = get_hog_features(fimage[:,:,0], orient, pix_per_cell, cell_per_block,
+                            vis=False, feature_vec=False)
+    hog1 = get_hog_features(fimage[:,:,1], orient, pix_per_cell, cell_per_block,
+                            vis=False, feature_vec=False)
+    hog2 = get_hog_features(fimage[:,:,2], orient, pix_per_cell, cell_per_block,
+                            vis=False, feature_vec=False)
     windows = []
     on_windows = []
     for y in range(0, image.shape[0]-window_h, shift):
@@ -381,7 +419,6 @@ def detect_cars(image):
             windows.append(((x, y), (x+window_w, y+window_h)))
             window = ((x,y), (x+window_w,y+window_h))
 
-            #print ((x,y+y_u), (x+window_w,y+window_h+y_u))
             features = single_feat_vec(fimage, hog0, hog1, hog2, window)
             global features_algo1
             features_algo1 = features
@@ -392,18 +429,18 @@ def detect_cars(image):
 
             #7) If positive (prediction == 1) then save the window
             if prediction == 1:
-                window = ((x,y+y_u), (x+window_w,y+window_h+y_u))
+                window = ((int(x*scale),int((y*scale)+y_u)), (int((x+window_w)*scale),int((y+window_h)*scale+y_u)))
                 on_windows.append(window)
 
-    print "Detected windows: ", len(on_windows)
+    #debug_windows(image, windows)
+    #print "Detected windows: ", len(on_windows)
     window_img = draw_boxes(draw_image, on_windows, color=(0, 0, 255), thick=6)
-    cv2.imshow("detected windows", window_img)
     hp_image = process_heat_map(draw_image, on_windows)
-    cv2.imshow("Detect cars heat map", hp_image)
+    cv2.imshow("Detected vehicles", hstack_img(window_img, hp_image))
     return hp_image
 
 def process_image(image):
-    detect_cars(image)
+    return detect_vehicles(image)
     draw_image = np.copy(image)
 
     # Uncomment the following line if you extracted training
@@ -411,9 +448,9 @@ def process_image(image):
     # image you are searching is a .jpg (scaled 0 to 255)
     image = image.astype(np.float32)/255
 
-    y_start_stop = [400, 705] # Min and max in y to search in slide_window()
+    y_start_stop = [ROI_Y1, ROI_Y2] # Min and max in y to search in slide_window()
     windows = slide_window(image, x_start_stop=[None, None], y_start_stop=y_start_stop,
-                           xy_window=(64, 64), xy_overlap=(0.2, 0.2))
+                           xy_window=(64, 64), xy_overlap=(0.4, 0.4))
 
     print ("Processing windows: "  + str(len(windows)))
     hot_windows = search_windows(image, windows, svc, X_scaler, color_space=color_space,
@@ -423,17 +460,8 @@ def process_image(image):
                             hog_channel=hog_channel, spatial_feat=spatial_feat,
                             hist_feat=hist_feat, hog_feat=hog_feat)
 
-    #print features_algo1[:5]
-    #print features_algo2[:5]
-    #print "Shape: ", len(features_algo2), len(features_algo1)
-    #print "Shape: ", features_algo2[0].shape, features_algo1[0].shape
-    #print "Shape: ", features_algo1[0].shape
-    print "diff: ", np.diff(features_algo2 - features_algo1)
-
     hp_image = process_heat_map(draw_image, hot_windows)
 
-    #debug_windows(image, windows)
-    #debug_windows(image, hot_windows)
     #window_img = draw_boxes(image, hot_windows, color=(0, 0, 255), thick=6)
 
     #cv2.imshow("Output combined", hstack_img(window_img, hp_image));
@@ -458,6 +486,9 @@ else:
     cap = cv2.VideoCapture(VIDEOFILE)
     while True:
         ret, image = cap.read()
+        if ret == False:
+            break
+
         IMAGE_HEIGHT, IMAGE_WIDTH, c = image.shape
 
         if out is None:
@@ -468,10 +499,11 @@ else:
             if(frame_count < SKIP_COUNT):
                 continue
             print frame_count
+            #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             output_img = process_image(image)
             out.write(output_img)
 
-            cv2.imshow("Video output", output_img)
+            #cv2.imshow("Video output", output_img)
             c = cv2.waitKey(31) & 0x7F
             if c == 'q' or c == 27:
                 exit(0)
