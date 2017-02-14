@@ -66,17 +66,22 @@ As mentioned above two approaches were taken to implement sliding window search
 Steps involved:
  1. Read 'vehicle' and 'non-vehicle' data from respective folders ([data/vehicles](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [data/non-vehicles](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip))
  
- [Example images "Vehicle"](./debug/vehicle.png)
+ ![Example images "Vehicle"](./debug/vehicle.png)
+ Example image "Vehicle"
  
- [Example images "Non-vehicle"](./debug/non-vehicle.png)
+ 
+ ![Example images "Non-vehicle"](./debug/non-vehicle.png)
+ Example image "Non-vehicle"
  
  2. Create a separate list of vehicle images and non-vehicle image filenames
  3. Run through all images in the list using extract_features() function and extract histogram, spatial and HOG features for all images
  Visualization of the HOG features is as follows
  
- ["Vehicle" image with HOG features](./debug/car_HOG.png)
+ !["Vehicle" image with HOG features](./debug/car_HOG.png)
+ "Vehicle" image with HOG features
  
- ["Non-vehicle" image with HOG features](./debug/notcar_HOG.png)
+ !["Non-vehicle" image with HOG features](./debug/notcar_HOG.png)
+ "Non-vehicle" image with HOG features
  
  4. Once all features are extracted, train a scaler which would help normalize features going ahead
  5. After the scaler is trained, pass all features through it to generate scaled features
@@ -136,7 +141,7 @@ One of these algos can be chosen with the help of global variable "USE_IMAGE_HOG
 
 Heat map during vehicle detection is as shown below
 
- ["Vehicle" detection heat map with history](./debug/heatmap_heat_history.png)
+ !["Vehicle" detection heat map with history](./debug/heatmap_heat_history.png)
 
 ### Dual heat thresholding
 1. At times when the bounding boxes count over a 'vehicle' are less, heat map may have an entry but global thresholding would not count it in the final result since the overall threshold is high (around 13)
@@ -158,10 +163,11 @@ Approach 1(sliding scaled windows) is slow as HOG features which are computation
 
 ### Video Implementation
   Video pipeline is the same as image pipeline except its run over the entire set of images in the video. Output of the execution could be found at 
-  ["Execution video"](./output_project_video_all.avi)
+["Execution video"](./output_project_video_all.avi)
 
 ### Bounding boxes drawn onto the input frame:
-!["Vehicle" detection output][./debug/detected_cars.png]
+
+!["Vehicle" detection output](./debug/detected_cars.png)
 
 
 Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes
