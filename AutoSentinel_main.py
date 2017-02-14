@@ -6,7 +6,6 @@ import glob
 import time
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
-from functions import *
 from skimage.feature import hog
 
 # NOTE: the next import is only valid for scikit-learn version <= 0.17
