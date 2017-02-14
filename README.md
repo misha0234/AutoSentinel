@@ -165,6 +165,8 @@ Approach 1(sliding scaled windows) is slow as HOG features which are computation
   Video pipeline is the same as image pipeline except its run over the entire set of images in the video. Output of the execution could be found at 
 ["Execution video"](./output_project_video_all.avi)
 
+[![EXECUTION_PREVIEW](http://img.youtube.com/vi/nhef1_OPKFo/0.jpg)](https://youtu.be/nhef1_OPKFo "Output video included in project")
+
 ### Bounding boxes drawn onto the input frame:
 
 !["Vehicle" detection output](./debug/detected_cars.png)
