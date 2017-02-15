@@ -3,6 +3,8 @@
 
 ---
 
+AutoSentinel is a computer vision based vehicle detection and tracking module. This module is capable of multiple vehicle detection using two different methods. A Linear Support Vector Machine classifier trained with car and non-car images helps with identification of a car using a multi-scale sliding window rasterization over Region Of Interest in image. Histogram of Oriented Graphs along with Spatial features and Histogram features are used to create a feature vector which after scaling is used to classify if the contents in the window are that of a car or a non-car. Heat map, Heat history, HOG on ROI are some of the techniques used to improve the speed of execution of the module. Dynamic Scaling is another technique used to improve accuracy dynamically depending on position of vehicle in the image.
+
 Following are the steps involved in accomplishing the task:
 * Training the scaler and classifier
 * Running inference on images
